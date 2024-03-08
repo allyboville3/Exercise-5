@@ -1,0 +1,494 @@
+---
+title: "Exercise 5"
+author: "Alexandra Boville"
+date: "2024-03-01"
+output: html_document
+---
+
+# Generate Sampling Distributions and CI's
+
+# Challenge 1
+
+Libraries used in this Exercise:
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(dplyr)
+library(infer)
+library(ggplot2)
+library(mosaic)
+```
+
+
+## Step 1: Loading Dataset and Creating Dataframe 
+```{r, warning=FALSE, message=FALSE}
+movies <- "https://raw.githubusercontent.com/difiore/ada-2024-datasets/main/IMDB-movies.csv"
+
+d <- read_csv(movies, col_names = TRUE)
+ 
+head (d)
+
+#ordering d dataframe by year to see range of years in dataframe
+#d <- d %>% 
+  #arrange(startYear) #can also order in descending order using desc()
+#d
+```
+
+## Step 2: Cleaning Up Our Data
+The code below filters the data to include movies from 1920-1979 that are between 1 and 3 hours long. This code also includes the addition of a new column called decades. 
+
+```{r}
+d <- d %>% 
+  #Filtering Data by year and length
+  filter(startYear >= 1920, 
+         startYear <= 1979, 
+         runtimeMinutes >= 60, 
+         runtimeMinutes <= 180) %>% 
+  #Adding new column for decades
+  mutate(decades = case_when(startYear < 1930 ~ "20's",
+                        startYear < 1940  ~ "30's", 
+                        startYear < 1950 ~ "40's",
+                        startYear < 1960 ~ "50's",
+                        startYear < 1970 ~ "60's",
+                        startYear >= 1970 ~ "70's")) %>% 
+  #arranging in order by year starting with earliest year first
+  arrange(startYear)
+
+d
+
+```
+## Step 3: Plotting Histograms Showing Run time length for each movie by Decade
+Using ggplot to show the distribution of movie runtimeMinutes for each Decade 
+```{r}
+p <- ggplot(d, aes(x = runtimeMinutes, fill = decades)) +
+  geom_histogram() +
+  facet_wrap(vars(decades)) + #allows for there to be multiple plots with same axis split by another column, in this case decades
+  theme_linedraw()
+p
+
+```
+## Step 4: Calcluating Population Mean and Standard Deviation in runtimeMinutes
+Grouping data by decde and calculating the mean and standard deviation in run time minutes for each decade.  
+```{r}
+results <- d %>% 
+  group_by(decades) %>% 
+  summarize(mean = mean(runtimeMinutes), sd = sd(runtimeMinutes))
+results
+  
+```
+## Step 5: Calculating Single Mean and Standard Deviation from a Single Sample of 100 Movies
+These mean values are *estimates* for population mean.
+```{r}
+movie_sample <- 100
+d_100 <- d %>% 
+  slice_sample(n = movie_sample, replace = FALSE) %>% 
+  group_by(decades) %>% 
+  summarize(mean = mean(runtimeMinutes), sd = sd(runtimeMinutes), na.rm = TRUE)
+d_100
+  
+
+```
+## Step 6: Calculate Standard Error for sample of 100 movies
+```{r}
+d_100_se <- d_100 %>% 
+  #slice_sample(n = movie_sample, replace = FALSE) %>% 
+  summarize(se = sd/sqrt(length(d_100)))
+  
+d_100_se
+
+```
+## Step 7: Comparing Actual Population Mean and Estimated SE
+Compare these estimates to the actual population mean runtimeMinutes for each decade and to the calculated SE in the population mean for samples of size 100 based on the population standard deviation for each decade.
+
+The actual population mean for movie length for each decade is as follows
+20's	96.25658			
+30's	90.30000			
+40's	97.20332			
+50's	98.94820			
+60's	105.58586		
+70's	103.75000	
+
+The standard error for a sample of 100 movies is below
+8.874120				
+9.131510				
+15.050068				
+7.962481				
+10.330069				
+5.914626	
+
+These standard errors vary by decade and are quite high so generating different estimations could result in values for the mean that are not accurate. The estimated SE values tell us how far off our sample mean values can vary from the population mean. All of the SE values are above 5 so our sample mean is likely to be at least this far off from the actual population mean. This could be improved by increasing the sample size for these estimations. 
+
+## Step 8: Generate a Sampling Distribution + Step 9: calculating Mean and SD for Sampling Distribution
+Generate a sampling distribution of mean runtimeMinutes for each decade
+A) draw 1000 random samples of 100 movie from each decade (without replacement and for each sample)
+B) calc. mean and sd runtimeMinutes for each decade
+
+```{r}
+reps = 1000
+samp_dist_d <- d %>%
+    rep_sample_n(size = movie_sample, reps = reps, replace = FALSE) %>%
+    group_by(decades) %>%
+    summarize(mean = mean(runtimeMinutes), sd = sd(runtimeMinutes)) %>%
+    pull(mean, sd)
+
+samp_dist_d
+
+samp_dist_mean_plot_d <- histogram(samp_dist_d , xlab = "Sampling Distribution for the Mean Run Time Minutes of Movies by Decade")
+samp_dist_mean_plot_d
+```
+
+## Step 9: Calcluating Mean and Standard Deviation of Sampling Distribution
+```{r}
+(samp_dist_mean <- mean(samp_dist_d))
+(samp_dist_sd <- sd(samp_dist_d))
+```
+
+## Step 10: Calculating Standard Error in runtimeMinutes
+  1) as estimated from your first sample of 100 movies (already completed above - SEE STEP 6)
+  2) as calculated from the known population standard deviations for each decade
+  3) as estimated from the sampling distribution of sample means for each decade
+
+Formula for SE
+(se <- sd(s)/sqrt(length(s))) 
+```{r}
+
+#2
+se_results <- results$sd/sqrt(length(results))
+se_results
+
+
+#3
+se_samp_dist <- samp_dist_d/sqrt(length(samp_dist_d)) #calculates fro both mean and sd, couldn't figure out how to show se_samp_dist for jsut mean
+se_samp_dist
+```
+Estimation of standard error by option 1 had the loqest values and estimation of standard error from the sampling distribution had the highest values for each decade.  
+  
+  
+# Challenge 2
+
+```{r}
+f2 <- "https://raw.githubusercontent.com/difiore/ada-2024-datasets/main/zombies.csv"
+
+zombies <- read_csv(f2, col_names = TRUE)
+
+zombies
+```
+
+## Step 2: Calculating Mean and SD
+Calculate the population mean and standard deviation for each quantitative random variable in the dataset (height, weight, age, number of zombies killed, and years of education)
+```{r}
+#Population mean for height
+mean_height <- mean(zombies$height)
+mean_height
+
+#Population sd for height
+sd_height <- sd(zombies$height)
+sd_height 
+
+#Mean for weight
+mean_weight <- mean(zombies$weight)
+mean_weight
+
+#Sd for weight
+sd_weight <- sd(zombies$weight)
+sd_weight
+
+#Mean for Age
+mean_age <- mean(zombies$age)
+mean_age
+
+#Sd for age
+sd_age <- sd(zombies$age)
+sd_age
+
+#Mean zombies killed
+mean_zkilled <- mean(zombies$zombies_killed)
+mean_zkilled
+
+#Sd zombies killed
+sd_zkilled <- sd(zombies$zombies_killed)
+sd_zkilled
+
+#Mean years of education
+mean_yoe <- mean(zombies$years_of_education)
+mean_yoe
+
+#Sd years of education
+sd_yoe <- sd(zombies$years_of_education)
+sd_yoe
+
+```
+
+## Step 3: BoxPlot for each Variable 
+Plots for each gender
+```{r}
+p_height <- ggplot(zombies, aes(x=gender, y=height, fill=gender)) + 
+  geom_boxplot() +
+  ggtitle("Height for each Gender") +
+  theme_classic() 
+p_height
+
+p_weight <- ggplot(zombies, aes(x=gender, y=weight, fill=gender)) + 
+  geom_boxplot() +
+  ggtitle("Weight for each Gender") +
+  theme_classic() 
+p_weight
+
+p_age <- ggplot(zombies, aes(x=gender, y=age, fill=gender)) + 
+  geom_boxplot() +
+  ggtitle("Age for each Gender") +
+  theme_classic() 
+p_age
+
+p_zkilled <- ggplot(zombies, aes(x=gender, y=zombies_killed, fill=gender)) + 
+  geom_boxplot() +
+  ggtitle("Zombies Killed by each Gender") +
+  theme_classic() 
+p_zkilled
+
+p_yoe <- ggplot(zombies, aes(x=gender, y=years_of_education, fill=gender)) + 
+  geom_boxplot() +
+  ggtitle("Years of Education for each Gender") +
+  theme_classic() 
+p_yoe
+```
+
+## Step 4: Scatterplot of height and weight in relation to Age
+Points colored by gender
+```{r}
+p_scatter_height <- ggplot(data = zombies, aes(x = age, y = height,color = gender)) +
+  geom_point() +
+  ggtitle("Male and Female Height for Each Age") +
+  theme_bw()
+
+p_scatter_height
+
+p_scatter_weight <- ggplot(data = zombies, aes(x = age, y = weight,color = gender)) +
+  geom_point() +
+  ggtitle("Male and Female Weight for Each Age") +
+  theme_bw()
+
+p_scatter_weight
+```
+Females appear to be taller and weigh more across age groups compared to males. For both genders as age increases height also increases. For weight across age groups in both genders there is not clear relation between weight and age and both females and males have a greater overlap in weight across all age groups, with females still slightly having higher weight across all age groups. 
+
+## Step 5: Checking Whether These Variables are Drawn from a Normal Distribution 
+```{r}
+qq_height <- qqnorm(zombies$height, main = "QQ Plot - Height") 
+  qqline(zombies$height, col = "red")
+
+qq_weight <- qqnorm(zombies$weight, main = "QQ Plot - Weight") 
+  qqline(zombies$weight, col = "red")  
+  
+qq_age <- qqnorm(zombies$age, main = "QQ Plot - Age") 
+  qqline(zombies$age, col = "red")  
+  
+qq_zkilled <- qqnorm(zombies$zombies_killed, main = "QQ Plot - Zombies Killed") 
+  qqline(zombies$zombies_killed, col = "red") 
+
+qq_yoe <- qqnorm(zombies$years_of_education, main = "QQ Plot - Years of Education") 
+  qqline(zombies$years_of_education, col = "red")  
+
+hist_height <- hist(zombies$height, main = "Distribution - Height")
+hist_weight <- hist(zombies$weight, main = "Distribution - Weight")
+hist_age <- hist(zombies$age, main = "Distribution - Age")
+hist_zkilled <- hist(zombies$zombies_killed, main = "Distribution - Zombies Killed")
+hist_yoe <- hist(zombies$years_of_education, main = "Distribution - Years of Education")
+```
+Zombies Killed and Years of Education in this dataset do not follow a normal distribution. From the QQ plots you can see deviation from the qqline in addition to the clustering on points not following the normal line. From the histograms you can also see that the bars don't follow a normal distribution and are left skewed. 
+
+## Step 6: Sampling a Subset of 50 zombie apocalypse without replacement
+
+```{r}
+n = 50
+zombies_subset50 <- slice_sample(zombies, n = n, replace = FALSE)
+zombies_subset50
+```
+Calculating the Mean and SD for each variable
+```{r}
+
+#Population mean for height
+mean_height_s50 <- mean(zombies_subset50$height)
+mean_height_s50
+
+#Population sd for height
+sd_height_s50 <- sd(zombies_subset50$height)
+sd_height_s50
+
+#SE for height for a single sample
+se_height50 <- sd_height_s50/ sqrt(n)
+se_height50
+
+#Mean for weight
+mean_weight_s50 <- mean(zombies_subset50$weight)
+mean_weight_s50
+
+#Sd for weight
+sd_weight_s50 <- sd(zombies_subset50$weight)
+sd_weight_s50
+
+#SE for weight for a single sample
+se_weight50 <- sd_weight_s50/ sqrt(n)
+se_weight50
+
+#Mean for Age
+mean_age_s50 <- mean(zombies_subset50$age)
+mean_age_s50
+
+#Sd for age
+sd_age_s50 <- sd(zombies_subset50$age)
+sd_age_s50
+
+#SE for age for a single sample
+se_age50 <- sd_age_s50/ sqrt(n)
+se_age50
+
+#Mean zombies killed
+mean_zkilled_s50 <- mean(zombies_subset50$zombies_killed)
+mean_zkilled_s50
+
+#Sd zombies killed
+sd_zkilled_s50 <- sd(zombies_subset50$zombies_killed)
+sd_zkilled_s50
+
+#SE for zombies killed for a single sample
+se_zkilled50 <- sd_zkilled_s50/ sqrt(n)
+se_zkilled50
+
+#Mean years of education
+mean_yoe_s50 <- mean(zombies_subset50$years_of_education)
+mean_yoe_s50 
+
+#Sd years of education
+sd_yoe_s50 <- sd(zombies_subset50$years_of_education)
+sd_yoe_s50 
+
+#SE for years of education for a single sample
+se_yoe50 <- sd_yoe_s50/ sqrt(n)
+se_yoe50
+
+
+```
+
+Calculate 95% confidence intervals (Upper and Lower Limit)
+```{r}
+CI = function(zombies_subset50, level = 0.95) {
+    alpha <- 1 - level
+    ci = mean(zombies_subset50) + c(-1, 1) * qnorm(1 - (alpha/2)) * sqrt(var(zombies_subset50)/length(zombies_subset50))
+    return(ci)
+}
+
+CI(zombies_subset50$height)
+CI(zombies_subset50$weight)
+CI(zombies_subset50$age)
+CI(zombies_subset50$zombies_killed)
+CI(zombies_subset50$years_of_education)
+```
+## Step 7: Random Sampling 199 zombie apocalypse from 50 zombie apocalypese survivor subset
+
+```{r}
+reps <- 199
+samp_dist_mean_zombies_height <- do(reps) * mean(~height, data = slice_sample(zombies, n = 50, replace = FALSE)) 
+head(samp_dist_mean_zombies_height)
+
+samp_dist_mean_zombies_weight <- do(reps) * mean(~weight, data = slice_sample(zombies, n = 50, replace = FALSE)) 
+head(samp_dist_mean_zombies_weight)
+
+samp_dist_mean_zombies_age <- do(reps) * mean(~age, data = slice_sample(zombies, n = 50, replace = FALSE)) 
+head(samp_dist_mean_zombies_age)
+
+samp_dist_mean_zombies_zkilled <- do(reps) * mean(~zombies_killed, data = slice_sample(zombies, n = 50, replace = FALSE)) 
+head(samp_dist_mean_zombies_zkilled)
+
+samp_dist_mean_zombies_yoe <- do(reps) * mean(~years_of_education, data = slice_sample(zombies, n = 50, replace = FALSE)) 
+head(samp_dist_mean_zombies_yoe)
+```
+
+Calculate standard deviation of sampling distribution for each variables
+```{r}
+(sd_samp_dist_zombies_height <- sd(samp_dist_mean_zombies_height$mean))
+(sd_samp_dist_zombies_weight <- sd(samp_dist_mean_zombies_weight$mean))
+(sd_samp_dist_zombies_age <- sd(samp_dist_mean_zombies_age$mean))
+(sd_samp_dist_zombies_zkilled <- sd(samp_dist_mean_zombies_zkilled$mean))
+(sd_samp_dist_zombies_yoe <- sd(samp_dist_mean_zombies_yoe$mean))
+```
+The standard deviations from this sampling are significantly lower compared to the single subset of 50 individuals. They now correspond closely to the standard error values from the single subset of 50 individuals. 
+
+# Step 8: Plot the Sampling Distribution for the Mean for each Variable
+
+```{r}
+mean_plot_height <- histogram(~mean, data = samp_dist_mean_zombies_height, xlab = "Sampling Distribution for the Mean of Height")
+mean_plot_height
+
+mean_plot_weight <- histogram(~mean, data = samp_dist_mean_zombies_weight, xlab = "Sampling Distribution for the Mean of Weight")
+mean_plot_weight
+
+mean_plot_age <- histogram(~mean, data = samp_dist_mean_zombies_age, xlab = "Sampling Distribution for the Mean of Age")
+mean_plot_age
+
+mean_plot_zkilled <- histogram(~mean, data = samp_dist_mean_zombies_zkilled, xlab = "Sampling Distribution for the Mean of Zombies Killed")
+mean_plot_zkilled
+
+mean_plot_yoe <- histogram(~mean, data = samp_dist_mean_zombies_yoe, xlab = "Sampling Distribution for the Mean of Years of Education")
+mean_plot_yoe
+```
+All of the variables appear to be normally distributed from the sampling distribution. 
+
+## Constructing 95% Confidence Intervals from the Sampling Distribution
+```{r}
+#Lower and Upper bounds of CI for Height
+(lower_height <- quantile(samp_dist_mean_zombies_height$mean, 0.025))
+(upper_height <- quantile(samp_dist_mean_zombies_height$mean, 0.975))
+
+#Lower and Upper bounds of CI for Weight
+(lower_weight <- quantile(samp_dist_mean_zombies_weight$mean, 0.025))
+(upper_weight <- quantile(samp_dist_mean_zombies_weight$mean, 0.975))
+
+#Lower and Upper bounds of CI for Age
+(lower_weight <- quantile(samp_dist_mean_zombies_weight$mean, 0.025))
+(upper_weight <- quantile(samp_dist_mean_zombies_weight$mean, 0.975))
+
+#Lower and Upper bounds of CI for Zombies Killed
+(lower_zkilled <- quantile(samp_dist_mean_zombies_zkilled$mean, 0.025))
+(upper_zkilled <- quantile(samp_dist_mean_zombies_zkilled$mean, 0.975))
+
+#Lower and Upper bounds of CI for Years of Education
+(lower_yoe <- quantile(samp_dist_mean_zombies_yoe$mean, 0.025))
+(upper_yoe <- quantile(samp_dist_mean_zombies_yoe$mean, 0.975))
+```
+## Step 10 Using Bootstrapping to Generate CI's
+Generate a 95% confidence interval for each variable mean by resampling 1000 samples, with replacement, from your original sample
+
+```{r}
+#boostrapping a CI
+n_boot <- 1000
+n_zombie <- length(zombies)
+
+#CI's from bootstrapping for Height
+boot_height <- do(n_boot) * mean(~sample(zombies$height, length(zombies), replace = TRUE))
+(lower_height_boot <- quantile(boot_height$mean, 0.025))
+(upper_height_boot <- quantile(boot_height$mean, 0.975))
+
+#CI's from bootstrapping for Weight
+boot_weight <- do(n_boot) * mean(~sample(zombies$weight, length(zombies), replace = TRUE))
+(lower_weight_boot <- quantile(boot_weight$mean, 0.025))
+(upper_weight_boot <- quantile(boot_weight$mean, 0.975))
+
+#CI's from bootstrapping for Age
+boot_age <- do(n_boot) * mean(~sample(zombies$age, length(zombies), replace = TRUE))
+(lower_age_boot <- quantile(boot_age$mean, 0.025))
+(upper_age_boot <- quantile(boot_age$mean, 0.975))
+
+#CI's from bootstrapping for Weight
+boot_z_killed <- do(n_boot) * mean(~sample(zombies$zombies_killed, length(zombies), replace = TRUE))
+(lower_zkilled_boot <- quantile(boot_z_killed$mean, 0.025))
+(upper_zkilled_boot <- quantile(boot_z_killed$mean, 0.975))
+
+#CI's from bootstrapping for Weight
+boot_yoe <- do(n_boot) * mean(~sample(zombies$years_of_education, length(zombies), replace = TRUE))
+(lower_yoe_boot <- quantile(boot_yoe$mean, 0.025))
+(upper_yoe_boot <- quantile(boot_yoe$mean, 0.975))
+```
+
+
+
+
